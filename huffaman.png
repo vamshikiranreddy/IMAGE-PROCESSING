@@ -1,0 +1,58 @@
+image = imread('image.jpg');
+image = rgb2gray(image);
+imshow(image);
+title('Original Image');
+imgVector = image(:);
+[lzwCompressed, dictionary] = lzwCompress(imgVector);
+symbols = unique(lzwCompressed);
+prob = hist(lzwCompressed, symbols) / length(lzwCompressed);
+huffmanDict = huffmandict(symbols, prob);
+huffmanCompressed = huffmanenco(lzwCompressed, huffmanDict);
+fprintf('Compression Ratio: %.2f\n', numel(imgVector) / numel(huffmanCompressed));
+huffmanDecompressed = huffmandeco(huffmanCompressed, huffmanDict);
+lzwDecompressed = lzwDecompress(huffmanDecompressed, dictionary);
+decompressedImage = reshape(lzwDecompressed, size(image));
+imshow(decompressedImage, []);
+title('Decompressed Image');
+
+function [compressedData, dictionary] = lzwCompress(data)
+    dictionary = cell(1, 256);
+    for i = 1:256
+        dictionary{i} = i - 1;
+    end
+    data = double(data);
+    compressedData = [];
+    currentString = data(1);
+    for i = 2:length(data)
+        currentSymbol = data(i);
+        newString = [currentString, currentSymbol];
+        exists = any(cellfun(@(x) isequal(x, newString), dictionary));
+        if exists
+            currentString = newString;
+        else
+            index = find(cellfun(@(x) isequal(x, currentString), dictionary));
+            compressedData = [compressedData; index - 1];
+            dictionary{end + 1} = newString;
+            currentString = currentSymbol;
+        end
+    end
+    index = find(cellfun(@(x) isequal(x, currentString), dictionary));
+    compressedData = [compressedData; index - 1];
+end
+
+function decompressedData = lzwDecompress(compressedData, dictionary)
+    decompressedData = [];
+    currentString = dictionary{compressedData(1) + 1};
+    decompressedData = [decompressedData, currentString];
+    for i = 2:length(compressedData)
+        code = compressedData(i);
+        if code + 1 <= length(dictionary)
+            newString = dictionary{code + 1};
+        else
+            newString = [currentString, currentString(1)];
+        end
+        decompressedData = [decompressedData, newString];
+        dictionary{end + 1} = [currentString, newString(1)];
+        currentString = newString;
+    end
+end
